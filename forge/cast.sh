@@ -1,66 +1,109 @@
 #!/bin/sh
 set -eu
 
-# cast.sh
+# forge/cast.sh
 #
-# Assemble a Golem prompt by concatenating:
+# Compose a golem prompt by concatenating:
 #   forge/preamble.md
-#   personalities/<personality>.md
-#   roles/<role>.md
-#   domains/<domain>.md
+#   roles/<ROLE>.md
+#   personalities/<PERSON>.md
+#   skills/<SKILL>.md   (0+)
 #
 # Usage:
-#   forge/cast.sh <personality> <role> <domain> [output-name]
+#   forge/cast.sh ROLE PERSON \
+#     [--skills "s1 s2 ..."] \
+#     --out path/without/.md
+#
+# Example:
+#   forge/cast.sh writer precise-formal \
+#     --skills "writing/academic-structuring writing/responding-to-reviewers" \
+#     --out projects/minimodels/golems/minimodels-liam
 
-if [ "$#" -lt 3 ] || [ "$#" -gt 4 ]; then
-  echo "Usage: $0 <personality> <role> <domain> [output-name]" >&2
+ROOT_DIR=$(cd "$(dirname "$0")/.." && pwd)
+
+ROLE=""
+PERSON=""
+SKILLS_LIST=""
+OUT_BASENAME=""
+
+if [ "$#" -lt 2 ]; then
+  echo "Usage: $0 ROLE PERSON [--skills \"...\"] --out path" >&2
   exit 1
 fi
 
-# Resolve repo root: one level up from this script
-ROOT_DIR=$(cd "$(dirname "$0")/.." && pwd)
+ROLE=$1
+PERSON=$2
+shift 2
 
-PERSONALITY=$1
-ROLE=$2
-DOMAIN=$3
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --skills)
+      shift
+      SKILLS_LIST=${1-}
+      ;;
+    --out)
+      shift
+      OUT_BASENAME=${1-}
+      ;;
+    *)
+      echo "Unknown argument: $1" >&2
+      exit 1
+      ;;
+  esac
+  shift
+done
 
-if [ "$#" -eq 4 ]; then
-  OUTPUT_BASENAME=$4
-else
-  OUTPUT_BASENAME="${PERSONALITY}-${ROLE}-${DOMAIN}"
+if [ -z "$OUT_BASENAME" ]; then
+  echo "--out is required" >&2
+  exit 1
 fi
 
 PREAMBLE_FILE="${ROOT_DIR}/forge/preamble.md"
-PERSONALITY_FILE="${ROOT_DIR}/personalities/${PERSONALITY}.md"
 ROLE_FILE="${ROOT_DIR}/roles/${ROLE}.md"
-DOMAIN_FILE="${ROOT_DIR}/domains/${DOMAIN}.md"
+PERSON_FILE="${ROOT_DIR}/personalities/${PERSON}.md"
 
-OUTPUT_DIR="${ROOT_DIR}/golems"
-OUTPUT_FILE="${OUTPUT_DIR}/${OUTPUT_BASENAME}.md"
-
-# Check required files
-for f in "$PREAMBLE_FILE" "$PERSONALITY_FILE" "$ROLE_FILE" "$DOMAIN_FILE"; do
+# Validate required files
+for f in "$PREAMBLE_FILE" "$ROLE_FILE" "$PERSON_FILE"; do
   if [ ! -f "$f" ]; then
     echo "Missing file: $f" >&2
     exit 1
   fi
 done
 
+# Resolve skill files (supports subdirectories)
+SKILL_FILES=""
+if [ -n "$SKILLS_LIST" ]; then
+  for s in $SKILLS_LIST; do
+    # Try exact path first (for backward compatibility)
+    sf="${ROOT_DIR}/skills/${s}.md"
+    if [ ! -f "$sf" ]; then
+      # Search recursively in skills/ subdirectories
+      sf=$(find "${ROOT_DIR}/skills" -name "${s}.md" -type f | head -1)
+      if [ -z "$sf" ]; then
+        echo "Missing skill: skills/${s}.md (searched recursively)" >&2
+        exit 1
+      fi
+    fi
+    SKILL_FILES="$SKILL_FILES $sf"
+  done
+fi
+
+
+# Final output path (relative to repo root)
+case "$OUT_BASENAME" in
+  /*) OUTPUT_PATH="${OUT_BASENAME}.md" ;;
+  *)  OUTPUT_PATH="${ROOT_DIR}/${OUT_BASENAME}.md" ;;
+esac
+OUTPUT_DIR=$(dirname "$OUTPUT_PATH")
 mkdir -p "$OUTPUT_DIR"
 
-# Try date -Iseconds if available; fall back to plain date
 GEN_TIME=$(date -Iseconds 2>/dev/null || date)
 
 {
-  printf '<!-- Cast Golem: %s | Generated %s -->\n\n' "$OUTPUT_BASENAME" "$GEN_TIME"
+  printf '<!-- Cast Golem: %s | Generated %s -->\n\n' "$OUT_BASENAME" "$GEN_TIME"
 
-  # Preamble
+  # Universal preamble
   cat "$PREAMBLE_FILE"
-  printf '\n\n'
-
-  # Personality
-  printf '## Personality: %s\n\n' "$PERSONALITY"
-  cat "$PERSONALITY_FILE"
   printf '\n\n'
 
   # Role
@@ -68,10 +111,22 @@ GEN_TIME=$(date -Iseconds 2>/dev/null || date)
   cat "$ROLE_FILE"
   printf '\n\n'
 
-  # Domain
-  printf '## Domain: %s\n\n' "$DOMAIN"
-  cat "$DOMAIN_FILE"
-  printf '\n'
-} > "$OUTPUT_FILE"
+  # Personality
+  printf '## Personality: %s\n\n' "$PERSON"
+  cat "$PERSON_FILE"
+  printf '\n\n'
 
-echo "Golem prompt written to: $OUTPUT_FILE"
+  # Skills
+  printf '## Skills\n\n'
+  if [ -n "$SKILL_FILES" ]; then
+    for f in $SKILL_FILES; do
+      printf '### %s\n\n' "$(basename "$f" .md)"
+      cat "$f"
+      printf '\n\n'
+    done
+  else
+    printf '- (none)\n\n'
+  fi
+} > "$OUTPUT_PATH"
+
+echo "Golem written to: $OUTPUT_PATH"

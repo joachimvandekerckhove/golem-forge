@@ -24,4 +24,3 @@ list_category() {
 
 list_category "Personalities" "${ROOT_DIR}/personalities"
 list_category "Roles"         "${ROOT_DIR}/roles"
-list_category "Domains"      "${ROOT_DIR}/domains"
