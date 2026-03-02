@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "golemforge"
+version = "0.1.0"
+description = "Cursor-compatible MCP server for forging composite assistant prompts"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+  "fastmcp>=2.0.0"
+]
+
+[project.scripts]
+golemforge-mcp = "mcp_server:main"
+
+[tool.setuptools]
+py-modules = ["mcp_server"]
