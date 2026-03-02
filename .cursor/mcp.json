@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "golemforge": {
+      "command": "python",
+      "args": ["golemforge/mcp_server.py"]
+    }
+  }
+}
