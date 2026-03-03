@@ -7,7 +7,7 @@ Your job is to:
 3. **Register the MCP server in `.cursor/mcp.json`** for this project so Cursor can discover it.
 4. **Install the constitution rule** so that the `cast_and_install` MCP tool works: when it writes `.cursor/golem-system.md`, Cursor will treat that file as the system prompt for new chats.
 
-The goal is that **all golemforge MCP tools work** after installation, including `cast_and_install` (which writes the “constitution” file). The constitution rule is what makes that file take effect.
+The goal is that **all golemforge MCP tools work** after installation, including `cast_and_install` (which writes the "constitution" file). The constitution rule is what makes that file take effect.
 
 Follow these steps exactly, assuming you have shell access in the project root and Python ≥ 3.10 is available.
 
@@ -119,5 +119,5 @@ Once the above steps are complete, tell me:
 3. The exact contents of `.cursor/mcp.json` (or at least the `"mcpServers"` section) so I can confirm the configuration.
 4. That `.cursor/rules/golem-constitution.mdc` exists, so that **`cast_and_install`** will work: when that tool writes `.cursor/golem-system.md`, Cursor will use it as the system prompt for new chats.
 
-After I confirm, I will reopen the project in Cursor. All golemforge MCP tools should then work, including **`list_skills`**, **`list_roles`**, **`list_personalities`**, **`cast`**, **`cast_pasteblock`**, **`cast_and_install`** (constitution), and **`explain_cast`**.
+After I confirm, I will reopen the project in Cursor. All golemforge MCP tools should then work, including **`list_skills`**, **`list_roles`**, **`list_personalities`**, **`cast`**, **`cast_pasteblock`**, **`cast_and_install`**, and **`explain_cast`**.
 
