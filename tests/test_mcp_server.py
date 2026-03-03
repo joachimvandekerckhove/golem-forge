@@ -1,7 +1,7 @@
 """Smoke tests for the golemforge MCP server tools.
 
-Runs each tool function directly (no transport layer) and validates
-the returned payloads against the README-MCP.md specification.
+Runs each tool function directly (no transport layer) and checks that
+the returned payloads have the expected shape.
 """
 
 from __future__ import annotations
@@ -145,7 +145,9 @@ def test_base_template_renders() -> None:
     placeholders = [
         "{NAME}", "{INVOCATION_ID}", "{FORGE_VERSION}",
         "{SKILLS_REQUESTED}", "{SKILLS_INCLUDED}",
-        "{EXTRA_INSTRUCTIONS}", "{SKILLS_BUNDLE}", "{MANIFEST_JSON}",
+        "{EXTRA_INSTRUCTIONS}", "{SKILLS_BUNDLE}",
+        "{ROLE_SECTION}", "{PERSONALITY_SECTION}",
+        "{MANIFEST_JSON}",
     ]
     for ph in placeholders:
         assert ph in template, f"Template missing placeholder {ph}"
@@ -155,11 +157,28 @@ def test_base_template_renders() -> None:
     print(f"\n  PASS")
 
 
+def test_list_roles_and_personalities() -> None:
+    section("list_roles() and list_personalities()")
+
+    roles_result = srv.list_roles()
+    assert "roles" in roles_result and "count" in roles_result
+    assert isinstance(roles_result["roles"], list)
+
+    personalities_result = srv.list_personalities()
+    assert "personalities" in personalities_result and "count" in personalities_result
+    assert isinstance(personalities_result["personalities"], list)
+
+    print(f"  Roles discovered: {roles_result['count']}")
+    print(f"  Personalities discovered: {personalities_result['count']}")
+    print(f"\n  PASS")
+
+
 if __name__ == "__main__":
     tests = [
         test_names_loaded,
         test_base_template_renders,
         test_list_skills,
+        test_list_roles_and_personalities,
         test_cast_valid,
         test_cast_missing_skills,
         test_cast_pasteblock,

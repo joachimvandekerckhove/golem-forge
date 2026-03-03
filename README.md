@@ -1,34 +1,29 @@
 # golem-forge
 
-A modular system for defining, composing, and deploying **AI golems**—project-agnostic, role-aware, skill-rich assistants—using explicit, version-controlled specifications.
+`golem-forge` is a small set of files for describing AI "golems" as **roles**, **personalities**, and **skills**, plus an MCP server so Cursor can assemble prompts from those markdown files.
 
-`golem-forge` is designed for research labs and other serious technical environments where **clarity, reproducibility, and division of cognitive labor** matter. It treats AI assistants not as monolithic chat personas, but as *composed artifacts* built from well-defined parts.
+The aim is practical: keep the pieces that define an assistant in plain text, under version control, and easy to inspect.
 
-In mythology, a golem is a creature formed from clay or mud and brought to life through ritual inscription -- a constructed being that serves a specific purpose through explicit instructions. This name was chosen because, like the mythical golem, these AI assistants are explicitly constructed from well-defined components (roles, personalities, skills) rather than emerging organically, and they serve specific functions defined by their composition rather than possessing autonomous agency.
-
----
-
-## Core idea
-
-A **golem** is a composed assistant defined by:
-
-* exactly one **Role** (what the golem is responsible for),
-* exactly one **Personality** (how it reasons and interacts), and
-* zero or more **Skills** (what it knows how to do).
-
-These components live in separate files and are composed mechanically into a single Markdown prompt. The result is a stable, inspectable artifact that can be used in Cursor, ChatGPT, Claude, or other agentic environments.
-
-Crucially:
-
-* **Golem specifications are project-agnostic.**
-* **Projects decide which golems they instantiate and where they live.**
+In Terry Pratchett's Discworld books, golems are clay workers animated by a written scroll in their head. Changing the words on that scroll changes who they are and what they care about. This repository plays a similar role for AI helpers: the markdown files in `roles/`, `personalities/`, and `skills/` are the "scroll", and the MCP server simply reads and stitches them together.
 
 ---
 
-## Repository layout (MCP-focused)
+## Concepts
+
+- **Roles**: describe what the assistant is responsible for (for example: writer, analyst, reviewer). Role definitions live in `roles/*.md`.
+- **Personalities**: describe how the assistant communicates and reasons (for example: precise-formal, explanatory-empathetic). These live in `personalities/*.md`.
+- **Skills**: describe concrete capabilities or procedures (for example: `coding/python`, `modeling/bayesian-inference`). These live in `skills/*.md`.
+
+The MCP server can include any combination of skills, and optionally a role and personality, into a single composed system prompt. Users should edit or add skills, roles, and personalities to the `skills/`, `roles/`, and `personalities/` directories to match their own needs and preferences.
+
+---
+
+## Repository layout
 
 ```text
 .
+├── roles/                    # Role markdown files (optional in MCP casts)
+├── personalities/            # Personality markdown files (optional in MCP casts)
 ├── skills/                   # Skill markdown files used by the MCP server
 ├── templates/
 │   └── base_system.md        # Base system template for composed prompts
@@ -36,134 +31,15 @@ Crucially:
 ├── pyproject.toml            # Python packaging for the MCP server
 ├── names.json                # Deterministic list of golem names
 ├── tests/                    # MCP server tests (direct + STDIO transport)
-├── README.md                 # This file: conceptual overview + quickstart
-├── README-MCP.md             # Detailed MCP installation and usage
-├── installation-prompt.md    # Paste-ready prompt for AI-driven installation
-└── working/                  # Local documents and experiments (not required for MCP)
+├── README.md                 # This file: overview and reference
+└── installation-prompt.md    # Paste-ready prompt for AI-driven installation
 ```
 
 ---
 
-## Golem components
+## Installation and Cursor setup
 
-### Roles
-
-A **Role** defines the golem’s functional responsibility.
-
-Examples:
-
-* writer
-* analyst
-* coder-engineer
-* reviewer-critic
-* research-navigator
-
-A role answers the question:
-
-> *What job is this golem responsible for doing?*
-
-Roles should be **few**, broad, and stable.
-
----
-
-### Personalities
-
-A **Personality** defines interaction style and reasoning posture, parameterized loosely by OCEAN traits and strictly by certain well-defined characteristics and communication styles.
-
-Examples:
-
-* precise-formal
-* analytic-critical
-* structural-constructive
-* explanatory-empathetic
-
-A personality answers:
-
-> *How does this golem think, critique, and communicate?*
-
-Personalities should also be **few** and reusable.
-
----
-
-### Skills
-
-A **Skill** is a specific, composable capability that the golem has. Skills are defined in depth.
-
-Examples:
-
-* modeling-bayesian-inference
-* writing-responding-to-reviewers
-* coding-reproducibility-engineering
-* literature-mining
-
-A skill answers:
-
-> *What can this golem competently do and what supports these skills?*
-
-Skills are where most growth happens: you will likely accumulate many of them.
-
----
-
-## Golem specifications (YAML)
-
-Each golem is defined declaratively in `golemspecs/*.yaml`.
-
-Example:
-
-```yaml
-name: minimodels-liam-python-coder
-human_name: Liam
-role: coder-engineer
-personality: precise-formal
-skills:
-  - coding/python
-  - modeling/bayesian-inference
-  - modeling/simulation-diagnostics
-```
-
-Rules:
-
-* Filenames and slugs must match their corresponding `.md` files.
-* No project information belongs here.
-* These specs are reusable across projects.
-
----
-
-## Design principles
-
-### Explicit composition
-
-No hidden defaults. Every behavior comes from a file you can read and version.
-
-### Project-agnostic identities
-
-Golems do not “belong” to projects. Projects instantiate golems.
-
-### Reproducibility
-
-A composed golem is a stable artifact. If the files don’t change, the golem doesn’t change.
-
-### Separation of concerns
-
-* Roles answer *what*.
-* Personalities answer *how*.
-* Skills answer *with what competence*.
-
-### Minimal magic
-
-Shell scripts are POSIX-safe. Python scripts are explicit and auditable. `make` stays dumb.
-
----
-
-## Typical workflow
-
-1. Define or refine Roles / Skills / Personalities.
-2. Declare golems in `golemspecs/*.yaml`.
-3. Write or update a project description in `projects/<project>/project.md`.
-4. Run `make cast-all PROJECT=<project>`.
-5. Use the composed golems in Cursor or your preferred agent environment.
-
-If you are using **Cursor** and want a reusable MCP server that can forge and install these golem prompts for you, you can set it up for any project with:
+From a clean environment with Python >= 3.10, in your Cursor project:
 
 ```bash
 python -m venv .venv
@@ -173,42 +49,51 @@ python -m pip install "golemforge @ git+https://github.com/joachimvandekerckhove
 golemforge-install-cursor
 ```
 
-For more detail on the MCP server itself, see `README-MCP.md`.
+This installs the MCP server into `.venv` and creates or updates `.cursor/mcp.json` so Cursor can discover the `golemforge` MCP server.
+
+If you only want a library-style install (no project wiring), you can stop after the `pip install` step. The `golemforge-mcp` executable will still be available in the virtual environment.
+
+To run the server manually (for testing or use with another MCP client):
+
+```bash
+golemforge-mcp
+```
 
 ---
 
-## What this is *not*
+## MCP tools
 
-* Not an autonomous agent framework.
-* Not a marketplace or prompt zoo.
-* Not optimized for casual chat.
+All tools live under the `golemforge` MCP server.
 
-`golem-forge` is infrastructure for **thinking clearly with AI in serious work**.
+- **`list_skills()`**: returns available skill IDs from `skills/*.md`.
+- **`list_roles()`**: returns available role IDs from `roles/*.md`.
+- **`list_personalities()`**: returns available personality IDs from `personalities/*.md`.
+
+- **`cast(skills, extra_instructions="", role=None, personality=None)`**  
+  Builds a full prompt package:
+  - includes the base template, selected skills, and optional role and personality;
+  - returns `golem_name`, `compiled_prompt`, `paste_block`, `skill_hashes`, and a small manifest (including optional `role`, `role_hash`, `personality`, `personality_hash`).
+
+- **`cast_pasteblock(skills, extra_instructions="", role=None, personality=None)`**  
+  Lighter version of `cast` that returns only `golem_name` and `paste_block`.
+
+- **`cast_and_install(skills, extra_instructions="", role=None, personality=None)`**  
+  Like `cast`, but also writes the compiled system prompt to `.cursor/golem-system.md` in the current project so that Cursor can treat it as a persistent "constitution" (assuming the project includes the `.cursor/rules/golem-constitution.mdc` rule file).
+
+- **`explain_cast(skills)`**  
+  Shows which files would be included, which skills are missing, and an approximate character-count for the resulting prompt.
+
+When a requested skill, role, or personality is missing, the tools return a small error payload with a short code (for example, `missing_skills`, `missing_role`, `missing_personality`) and a suggestion about which listing tool to call.
 
 ---
 
-## Future extensions (optional)
+## Self-checks
 
-* Spec validation (`forge/validate.py`).
-* Project-level TEAM orchestration files.
-* Skill dependency graphs.
-* Formal policy / governance layers.
+If you are working from a local clone of this repository, you can run a few quick checks:
 
-All of these can be added without breaking the current design.
+```bash
+python -m py_compile mcp_server.py
+python tests/test_mcp_server.py
+```
 
----
-
-## Philosophy
-
-A golem is not a person. It is a constructed instrument.
-
-The goal of `golem-forge` is to make those instruments:
-
-* explicit,
-* inspectable,
-* composable, and
-* accountable.
-
-If an AI is going to assist serious intellectual work, it should be built with the same care as any other research tool.
-
-Given a project description, the interaction between the user and the golems should be minimal.
+The test script exercises the main tools directly and prints a short summary.

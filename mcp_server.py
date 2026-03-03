@@ -24,6 +24,8 @@ MAX_PROMPT_CHARACTERS = 100_000
 
 PROJECT_ROOT = Path(__file__).resolve().parent
 SKILLS_DIR = PROJECT_ROOT / "skills"
+ROLES_DIR = PROJECT_ROOT / "roles"
+PERSONALITIES_DIR = PROJECT_ROOT / "personalities"
 TEMPLATES_DIR = PROJECT_ROOT / "templates"
 BASE_TEMPLATE_PATH = TEMPLATES_DIR / "base_system.md"
 NAMES_PATH = PROJECT_ROOT / "names.json"
@@ -61,6 +63,25 @@ def _list_skill_ids() -> list[str]:
     return sorted(skills)
 
 
+def _list_ids(root: Path) -> list[str]:
+    """Generic helper to list markdown-based IDs under a root directory."""
+
+    items: list[str] = []
+    if not root.exists():
+        return items
+
+    for md_file in root.glob("**/*.md"):
+        rel = md_file.relative_to(root)
+        if any(part.startswith(".") for part in rel.parts):
+            continue
+        if md_file.name.startswith("."):
+            continue
+        item_id = rel.with_suffix("").as_posix()
+        items.append(item_id)
+
+    return sorted(items)
+
+
 def _validate_skills(skills: list[str]) -> tuple[list[str], list[str]]:
     included: list[str] = []
     missing: list[str] = []
@@ -71,6 +92,34 @@ def _validate_skills(skills: list[str]) -> tuple[list[str], list[str]]:
         else:
             missing.append(skill_id)
     return included, missing
+
+
+def _load_role_text(role: str | None) -> tuple[str | None, str | None]:
+    """Resolve a role ID to its markdown text and hash, or (None, None)."""
+
+    if not role:
+        return None, None
+
+    path = ROLES_DIR / f"{role}.md"
+    if not path.exists() or not path.is_file():
+        raise FileNotFoundError(f"Role '{role}' not found at {path}")
+
+    text = _safe_read_text(path)
+    return text, _sha256_text(text)
+
+
+def _load_personality_text(personality: str | None) -> tuple[str | None, str | None]:
+    """Resolve a personality ID to its markdown text and hash, or (None, None)."""
+
+    if not personality:
+        return None, None
+
+    path = PERSONALITIES_DIR / f"{personality}.md"
+    if not path.exists() or not path.is_file():
+        raise FileNotFoundError(f"Personality '{personality}' not found at {path}")
+
+    text = _safe_read_text(path)
+    return text, _sha256_text(text)
 
 
 def _load_names() -> list[str]:
@@ -89,7 +138,12 @@ def _error_response(code: str, message: str, **extra: Any) -> dict[str, Any]:
     return payload
 
 
-def _build_cast(skills: list[str], extra_instructions: str = "") -> dict[str, Any]:
+def _build_cast(
+    skills: list[str],
+    extra_instructions: str = "",
+    role: str | None = None,
+    personality: str | None = None,
+) -> dict[str, Any]:
     try:
         requested = list(skills)
         included, missing = _validate_skills(requested)
@@ -99,6 +153,26 @@ def _build_cast(skills: list[str], extra_instructions: str = "") -> dict[str, An
                 "Some requested skills were not found.",
                 missing_skills=missing,
                 suggestion="Call list_skills() to discover valid IDs.",
+            )
+
+        try:
+            role_text, role_hash = _load_role_text(role)
+        except FileNotFoundError:
+            return _error_response(
+                "missing_role",
+                "Requested role was not found.",
+                requested_role=role,
+                suggestion="Call list_roles() to discover valid IDs.",
+            )
+
+        try:
+            personality_text, personality_hash = _load_personality_text(personality)
+        except FileNotFoundError:
+            return _error_response(
+                "missing_personality",
+                "Requested personality was not found.",
+                requested_personality=personality,
+                suggestion="Call list_personalities() to discover valid IDs.",
             )
 
         base_template = _safe_read_text(BASE_TEMPLATE_PATH)
@@ -127,7 +201,33 @@ def _build_cast(skills: list[str], extra_instructions: str = "") -> dict[str, An
             "skills_included": normalized_skills,
             "skill_hashes": {key: skill_hashes[key] for key in sorted(skill_hashes)},
         }
+        if role:
+            manifest["role"] = role
+            if role_hash:
+                manifest["role_hash"] = role_hash
+        if personality:
+            manifest["personality"] = personality
+            if personality_hash:
+                manifest["personality_hash"] = personality_hash
         manifest_json = json.dumps(manifest, indent=2, ensure_ascii=True)
+
+        if role_text:
+            role_section = (
+                f"<!-- BEGIN ROLE: {role} -->\n"
+                f"{role_text.rstrip()}\n"
+                f"<!-- END ROLE: {role} -->"
+            )
+        else:
+            role_section = "(no role selected)"
+
+        if personality_text:
+            personality_section = (
+                f"<!-- BEGIN PERSONALITY: {personality} -->\n"
+                f"{personality_text.rstrip()}\n"
+                f"<!-- END PERSONALITY: {personality} -->"
+            )
+        else:
+            personality_section = "(no personality selected)"
 
         compiled_prompt = base_template.format(
             NAME=golem_name,
@@ -137,6 +237,8 @@ def _build_cast(skills: list[str], extra_instructions: str = "") -> dict[str, An
             SKILLS_INCLUDED=", ".join(included) if included else "(none)",
             EXTRA_INSTRUCTIONS=extra_instructions.strip() or "(none)",
             SKILLS_BUNDLE=skills_bundle or "(no skills selected)",
+            ROLE_SECTION=role_section,
+            PERSONALITY_SECTION=personality_section,
             MANIFEST_JSON=manifest_json,
         )
 
@@ -210,7 +312,42 @@ def list_skills() -> dict[str, Any]:
 
 
 @mcp.tool()
-def cast(skills: list[str], extra_instructions: str = "") -> dict[str, Any]:
+def list_roles() -> dict[str, Any]:
+    """List available role IDs discovered under `roles/`."""
+
+    try:
+        roles = _list_ids(ROLES_DIR)
+        return {"roles": roles, "count": len(roles)}
+    except Exception as exc:
+        return _error_response(
+            "list_roles_failure",
+            "Unable to enumerate roles.",
+            details=str(exc),
+        )
+
+
+@mcp.tool()
+def list_personalities() -> dict[str, Any]:
+    """List available personality IDs discovered under `personalities/`."""
+
+    try:
+        personalities = _list_ids(PERSONALITIES_DIR)
+        return {"personalities": personalities, "count": len(personalities)}
+    except Exception as exc:
+        return _error_response(
+            "list_personalities_failure",
+            "Unable to enumerate personalities.",
+            details=str(exc),
+        )
+
+
+@mcp.tool()
+def cast(
+    skills: list[str],
+    extra_instructions: str = "",
+    role: str | None = None,
+    personality: str | None = None,
+) -> dict[str, Any]:
     """Forge a complete prompt package from selected skill IDs.
 
     Use this tool when you want the full output payload including provenance,
@@ -219,18 +356,33 @@ def cast(skills: list[str], extra_instructions: str = "") -> dict[str, Any]:
     manifest keeps a normalized alphabetical list for reproducibility.
     """
 
-    return _build_cast(skills=skills, extra_instructions=extra_instructions)
+    return _build_cast(
+        skills=skills,
+        extra_instructions=extra_instructions,
+        role=role,
+        personality=personality,
+    )
 
 
 @mcp.tool()
-def cast_pasteblock(skills: list[str], extra_instructions: str = "") -> dict[str, Any]:
+def cast_pasteblock(
+    skills: list[str],
+    extra_instructions: str = "",
+    role: str | None = None,
+    personality: str | None = None,
+) -> dict[str, Any]:
     """Forge only the golem name and paste-ready block for quick bootstrapping.
 
     This is a lightweight convenience wrapper around `cast` when downstream
     automation only needs the generated persona name and final paste text.
     """
 
-    result = _build_cast(skills=skills, extra_instructions=extra_instructions)
+    result = _build_cast(
+        skills=skills,
+        extra_instructions=extra_instructions,
+        role=role,
+        personality=personality,
+    )
     if not result.get("ok", False):
         return result
     return {
@@ -240,7 +392,12 @@ def cast_pasteblock(skills: list[str], extra_instructions: str = "") -> dict[str
 
 
 @mcp.tool()
-def cast_and_install(skills: list[str], extra_instructions: str = "") -> dict[str, Any]:
+def cast_and_install(
+    skills: list[str],
+    extra_instructions: str = "",
+    role: str | None = None,
+    personality: str | None = None,
+) -> dict[str, Any]:
     """Forge a golem and install it as the project constitution for future chats.
 
     Same as `cast`, but also writes the compiled system prompt to
@@ -251,7 +408,12 @@ def cast_and_install(skills: list[str], extra_instructions: str = "") -> dict[st
     this workspace.
     """
 
-    result = _build_cast(skills=skills, extra_instructions=extra_instructions)
+    result = _build_cast(
+        skills=skills,
+        extra_instructions=extra_instructions,
+        role=role,
+        personality=personality,
+    )
     if not result.get("ok", False):
         return result
 
