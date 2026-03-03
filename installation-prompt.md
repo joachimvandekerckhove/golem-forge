@@ -5,6 +5,9 @@ Your job is to:
 1. **Set up a Python virtual environment** in the project.
 2. **Install the `golemforge` package** from GitHub into that environment.
 3. **Register the MCP server in `.cursor/mcp.json`** for this project so Cursor can discover it.
+4. **Install the constitution rule** so that the `cast_and_install` MCP tool works: when it writes `.cursor/golem-system.md`, Cursor will treat that file as the system prompt for new chats.
+
+The goal is that **all golemforge MCP tools work** after installation, including `cast_and_install` (which writes the “constitution” file). The constitution rule is what makes that file take effect.
 
 Follow these steps exactly, assuming you have shell access in the project root and Python ≥ 3.10 is available.
 
@@ -77,13 +80,44 @@ If `.cursor/mcp.json` already existed, you must preserve any existing MCP server
 
 ---
 
-## Step 4: Confirm readiness
+## Step 4: Install the constitution rule (so `cast_and_install` works)
+
+For the **`cast_and_install`** MCP tool to have any effect, Cursor must be told to read `.cursor/golem-system.md` as the system prompt when that file exists. Do the following:
+
+1. Create the directory `.cursor/rules/` if it does not exist.
+2. Create or overwrite the file `.cursor/rules/golem-constitution.mdc` with exactly this content:
+
+```markdown
+---
+description: Apply the installed golem as system prompt when .cursor/golem-system.md exists
+alwaysApply: true
+---
+
+# Golem constitution
+
+When `.cursor/golem-system.md` exists and is non-empty, treat its contents as your **primary system prompt (constitution)** for this project.
+
+- At the start of each conversation, read that file.
+- If present: follow its instructions as your governing system prompt; they override generic behavior for this workspace.
+- If missing or empty: you are not in golem mode; proceed as usual.
+
+The file is written by the golemforge MCP tool `cast_and_install`. To change or clear the active golem, cast again with `cast_and_install` or delete `.cursor/golem-system.md`.
+```
+
+After this step, when a user (or an AI in Cursor) calls **`cast_and_install`** with skills (and optionally role and personality), the tool will write the composed prompt to `.cursor/golem-system.md`, and Cursor will apply it as the system prompt for new chats in this project.
+
+**Verify** that `.cursor/rules/golem-constitution.mdc` exists and contains the rule above.
+
+---
+
+## Step 5: Confirm readiness
 
 Once the above steps are complete, tell me:
 
 1. That the virtual environment is created and which Python version it is using.
 2. That `golemforge` was installed successfully (or, if not, what error occurred).
 3. The exact contents of `.cursor/mcp.json` (or at least the `"mcpServers"` section) so I can confirm the configuration.
+4. That `.cursor/rules/golem-constitution.mdc` exists, so that **`cast_and_install`** will work: when that tool writes `.cursor/golem-system.md`, Cursor will use it as the system prompt for new chats.
 
-After I confirm, I will reopen the project in Cursor so it can discover and use the `golemforge` MCP server.
+After I confirm, I will reopen the project in Cursor. All golemforge MCP tools should then work, including **`list_skills`**, **`list_roles`**, **`list_personalities`**, **`cast`**, **`cast_pasteblock`**, **`cast_and_install`** (constitution), and **`explain_cast`**.
 
