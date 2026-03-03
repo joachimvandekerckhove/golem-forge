@@ -8,8 +8,10 @@ The server is designed for Cursor MCP integration over STDIO.
 
 from __future__ import annotations
 
+import argparse
 import hashlib
 import json
+import sys
 import uuid
 from pathlib import Path
 from random import choice
@@ -310,6 +312,61 @@ def explain_cast(skills: list[str]) -> dict[str, Any]:
 def main() -> None:
     """Console entrypoint for running the MCP server over STDIO."""
     mcp.run(transport="stdio")
+
+
+def install_cursor_cli() -> None:
+    """Console entrypoint for wiring golemforge into a Cursor project.
+
+    This writes or updates `.cursor/mcp.json` in the target project so that
+    Cursor can discover the `golemforge` MCP server. It assumes you have
+    already installed `golemforge` into the active Python environment.
+    """
+
+    parser = argparse.ArgumentParser(
+        prog="golemforge-install-cursor",
+        description=(
+            "Configure the current directory (or a given project) to use the "
+            "golemforge MCP server in Cursor by updating .cursor/mcp.json."
+        ),
+    )
+    parser.add_argument(
+        "--project-dir",
+        default=".",
+        help="Path to the Cursor project root (default: current directory).",
+    )
+    args = parser.parse_args()
+
+    project_root = Path(args.project_dir).resolve()
+    cursor_dir = project_root / ".cursor"
+    mcp_path = cursor_dir / "mcp.json"
+
+    cursor_dir.mkdir(parents=True, exist_ok=True)
+
+    config: dict[str, Any] = {"mcpServers": {}}
+    if mcp_path.exists():
+        try:
+            with mcp_path.open("r", encoding="utf-8") as f:
+                existing = json.load(f)
+            if isinstance(existing, dict):
+                config.update(existing)
+        except Exception:
+            # Fall back to a minimal config if existing file is invalid.
+            config = {"mcpServers": {}}
+
+    if "mcpServers" not in config or not isinstance(config["mcpServers"], dict):
+        config["mcpServers"] = {}
+
+    # Resolve the golemforge-mcp executable in the current Python environment.
+    command_path = Path(sys.executable).with_name("golemforge-mcp")
+    config["mcpServers"]["golemforge"] = {
+        "command": str(command_path),
+        "args": [],
+    }
+
+    with mcp_path.open("w", encoding="utf-8") as f:
+        json.dump(config, f, indent=2)
+
+    print(f"Configured golemforge MCP at {mcp_path}")
 
 
 if __name__ == "__main__":

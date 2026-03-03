@@ -25,39 +25,21 @@ Crucially:
 
 ---
 
-## Repository layout
+## Repository layout (MCP-focused)
 
 ```text
 .
-├── forge/
-│   ├── preamble.md           # Universal instructions applied to all golems
-│   ├── cast.sh               # POSIX-safe composer (Markdown concatenation)
-│   └── cast-from-yaml.py     # YAML-driven casting wrapper
-│
-├── roles/                    # Exactly one per golem
-│   └── *.md
-│
-├── personalities/            # Exactly one per golem
-│   └── *.md
-│
-├── skills/                   # Zero or more per golem
-│   └── *.md
-│
-├── golemspecs/               # Project-agnostic golem definitions (YAML)
-│   └── *.yaml
-│
-├── projects/
-│   └── <project>/
-│       ├── project.md        # Project-level description (paper, code, etc.)
-│       └── golems/            # Composed golems for this project (generated)
-│           └── *.md
-│
+├── skills/                   # Skill markdown files used by the MCP server
 ├── templates/
-│   └── base_system.md       # Base system template for MCP and other tooling
-├── mcp_server.py            # FastMCP-based MCP server for Cursor
-├── pyproject.toml           # Python packaging for the MCP server
-├── README-MCP.md            # Installation and usage docs for the MCP server
-└── Makefile
+│   └── base_system.md        # Base system template for composed prompts
+├── mcp_server.py             # FastMCP-based MCP server entrypoint
+├── pyproject.toml            # Python packaging for the MCP server
+├── names.json                # Deterministic list of golem names
+├── tests/                    # MCP server tests (direct + STDIO transport)
+├── README.md                 # This file: conceptual overview + quickstart
+├── README-MCP.md             # Detailed MCP installation and usage
+├── installation-prompt.md    # Paste-ready prompt for AI-driven installation
+└── working/                  # Local documents and experiments (not required for MCP)
 ```
 
 ---
@@ -147,42 +129,6 @@ Rules:
 
 ---
 
-## Casting golems
-
-Casting means **composing a YAML spec into a concrete Markdown prompt**.
-
-### Cast all golems into a project
-
-```bash
-make cast-all PROJECT=minimodels
-```
-
-This:
-
-* reads all `golemspecs/*.yaml`,
-* composes each golem, and
-* writes them to:
-
-```text
-projects/minimodels/golems/*.md
-```
-
-### Cast a single golem
-
-```bash
-make cast SPEC=golemspecs/minimodels-liam-python-coder.yaml PROJECT=minimodels
-```
-
-### Default output (no project)
-
-If `PROJECT` is omitted, golems are written to:
-
-```text
-./golems/
-```
-
----
-
 ## Design principles
 
 ### Explicit composition
@@ -217,37 +163,14 @@ Shell scripts are POSIX-safe. Python scripts are explicit and auditable. `make` 
 4. Run `make cast-all PROJECT=<project>`.
 5. Use the composed golems in Cursor or your preferred agent environment.
 
-If you are using **Cursor** and want a reusable MCP server that can forge and install these golem prompts for you, you can set it up for any project with a single command from that project’s root:
+If you are using **Cursor** and want a reusable MCP server that can forge and install these golem prompts for you, you can set it up for any project with:
 
 ```bash
-python -m venv .venv \
-&& . .venv/bin/activate \
-&& python -m pip install --upgrade pip \
-&& pip install "golemforge @ git+https://github.com/joachimvandekerckhove/golem-forge.git" \
-&& mkdir -p .cursor \
-&& python - <<'PY'
-import json, os
-root = os.getcwd()
-mcp_path = os.path.join(root, ".cursor", "mcp.json")
-os.makedirs(os.path.dirname(mcp_path), exist_ok=True)
-
-config = {"mcpServers": {}}
-if os.path.exists(mcp_path):
-    try:
-        with open(mcp_path) as f:
-            config = json.load(f)
-    except Exception:
-        pass
-
-config.setdefault("mcpServers", {})["golemforge"] = {
-    "command": os.path.join(root, ".venv", "bin", "golemforge-mcp"),
-    "args": []
-}
-
-with open(mcp_path, "w") as f:
-    json.dump(config, f, indent=2)
-print("Configured golemforge MCP at", mcp_path)
-PY
+python -m venv .venv
+. .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install "golemforge @ git+https://github.com/joachimvandekerckhove/golem-forge.git"
+golemforge-install-cursor
 ```
 
 For more detail on the MCP server itself, see `README-MCP.md`.

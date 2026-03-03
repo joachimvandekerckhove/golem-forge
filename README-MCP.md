@@ -41,44 +41,17 @@ From a clean environment with Python ≥ 3.10:
 python -m venv .venv
 . .venv/bin/activate
 python -m pip install --upgrade pip
-pip install "golemforge @ git+https://github.com/joachimvandekerckhove/golem-forge.git"
+python -m pip install "golemforge @ git+https://github.com/joachimvandekerckhove/golem-forge.git"
 ```
 
 This exposes a `golemforge-mcp` executable in your virtual environment.
 
 ### One-shot project setup for Cursor
 
-To set up `golemforge` as a **project-scoped MCP server for Cursor** in a single step, run this from the root of your Cursor project (not necessarily this repo):
+To set up `golemforge` as a **project-scoped MCP server for Cursor** from an existing environment, run this from the root of your Cursor project (not necessarily this repo):
 
 ```bash
-python -m venv .venv \
-&& . .venv/bin/activate \
-&& python -m pip install --upgrade pip \
-&& pip install "golemforge @ git+https://github.com/joachimvandekerckhove/golem-forge.git" \
-&& mkdir -p .cursor \
-&& python - <<'PY'
-import json, os
-root = os.getcwd()
-mcp_path = os.path.join(root, ".cursor", "mcp.json")
-os.makedirs(os.path.dirname(mcp_path), exist_ok=True)
-
-config = {"mcpServers": {}}
-if os.path.exists(mcp_path):
-    try:
-        with open(mcp_path) as f:
-            config = json.load(f)
-    except Exception:
-        pass
-
-config.setdefault("mcpServers", {})["golemforge"] = {
-    "command": os.path.join(root, ".venv", "bin", "golemforge-mcp"),
-    "args": []
-}
-
-with open(mcp_path, "w") as f:
-    json.dump(config, f, indent=2)
-print("Configured golemforge MCP at", mcp_path)
-PY
+golemforge-install-cursor
 ```
 
 After this, open the project in Cursor; it will detect the `golemforge` MCP server automatically.
