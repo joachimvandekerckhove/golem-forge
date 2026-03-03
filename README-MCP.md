@@ -9,6 +9,7 @@
   - `list_skills()`
   - `cast(skills, extra_instructions="")`
   - `cast_pasteblock(skills, extra_instructions="")`
+  - `cast_and_install(skills, extra_instructions="")` — cast and write constitution to `.cursor/golem-system.md`
   - `explain_cast(skills)`
 - Deterministic skill listing and manifest normalization.
 - Provenance hashes for included skills + compiled prompt.
@@ -99,6 +100,9 @@ If requested skills are missing, returns structured error details with suggested
 ### `cast_pasteblock(skills, extra_instructions="")`
 Returns only `golem_name` and `paste_block`.
 
+### `cast_and_install(skills, extra_instructions="")`
+Same as `cast`, but also writes the compiled system prompt to `.cursor/golem-system.md`. The project rule `.cursor/rules/golem-constitution.mdc` (always applied) tells Cursor to read that file and use it as the system prompt for every new chat. Use this to make the cast golem your **persistent constitution**: it survives context limits and chat restarts. Response includes `installed_path` and `installed: true` on success, or `install_error` if the write failed.
+
 ### `explain_cast(skills)`
 Shows which files would be included and estimated total character count.
 
@@ -107,6 +111,17 @@ Shows which files would be included and estimated total character count.
 1. Ask Cursor to call `list_skills`.
 2. Call `cast` with selected skill IDs and optional extra instructions.
 3. Paste the returned `paste_block` into a new chat if not auto-inserted.
+
+## Persistent golem (constitution)
+
+To use the generated prompt as the **system prompt for every new chat** in this project (so you don’t lose the golem when context runs out):
+
+1. Use **`cast_and_install`** instead of `cast`, e.g. *“Cast and install a golem with skills: writing/academic-structuring, writing/narrative-clarity, …”*
+2. The tool writes the compiled prompt to `.cursor/golem-system.md`.
+3. The rule in `.cursor/rules/golem-constitution.mdc` is always applied and instructs the AI to read that file and treat it as the system prompt when present.
+4. New chats (and new conversations) in this workspace will then load the golem automatically. To change the active golem, run `cast_and_install` again with different skills; to clear it, delete `.cursor/golem-system.md`.
+
+`.cursor/golem-system.md` is in `.gitignore` by default so the active golem stays local; you can force-add it if you want to share a default golem with the repo.
 
 ## Self-test
 

@@ -1,1 +1,19 @@
-projects/*
+__pycache__/
+*.py[cod]
+*.so
+.Python
+.venv/
+venv/
+.env
+*.egg-info/
+build/
+dist/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+
+# Active golem constitution (written by cast_and_install); optional to commit
+.cursor/golem-system.md
+
+# working directory
+working/

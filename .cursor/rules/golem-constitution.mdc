@@ -1,0 +1,14 @@
+---
+description: Apply the installed golem as system prompt when .cursor/golem-system.md exists
+alwaysApply: true
+---
+
+# Golem constitution
+
+When `.cursor/golem-system.md` exists and is non-empty, treat its contents as your **primary system prompt (constitution)** for this project.
+
+- At the start of each conversation, read that file.
+- If present: follow its instructions as your governing system prompt; they override generic behavior for this workspace.
+- If missing or empty: you are not in golem mode; proceed as usual.
+
+The file is written by the golemforge MCP tool `cast_and_install`. To change or clear the active golem, cast again with `cast_and_install` or delete `.cursor/golem-system.md`.

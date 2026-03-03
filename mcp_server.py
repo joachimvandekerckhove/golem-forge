@@ -25,6 +25,8 @@ SKILLS_DIR = PROJECT_ROOT / "skills"
 TEMPLATES_DIR = PROJECT_ROOT / "templates"
 BASE_TEMPLATE_PATH = TEMPLATES_DIR / "base_system.md"
 NAMES_PATH = PROJECT_ROOT / "names.json"
+CURSOR_DIR = PROJECT_ROOT / ".cursor"
+GOLEM_SYSTEM_PATH = CURSOR_DIR / "golem-system.md"
 
 mcp = FastMCP("golemforge")
 
@@ -233,6 +235,36 @@ def cast_pasteblock(skills: list[str], extra_instructions: str = "") -> dict[str
         "golem_name": result["golem_name"],
         "paste_block": result["paste_block"],
     }
+
+
+@mcp.tool()
+def cast_and_install(skills: list[str], extra_instructions: str = "") -> dict[str, Any]:
+    """Forge a golem and install it as the project constitution for future chats.
+
+    Same as `cast`, but also writes the compiled system prompt to
+    `.cursor/golem-system.md`. The project rule in `.cursor/rules/golem-constitution.mdc`
+    tells Cursor to apply that file as the system prompt for every new chat in this
+    project, so the golem persists across context limits and chat restarts.
+    Use this when you want the cast golem to become the default assistant for
+    this workspace.
+    """
+
+    result = _build_cast(skills=skills, extra_instructions=extra_instructions)
+    if not result.get("ok", False):
+        return result
+
+    try:
+        CURSOR_DIR.mkdir(parents=True, exist_ok=True)
+        GOLEM_SYSTEM_PATH.write_text(result["compiled_prompt"], encoding="utf-8")
+        result = dict(result)
+        result["installed_path"] = str(GOLEM_SYSTEM_PATH.relative_to(PROJECT_ROOT))
+        result["installed"] = True
+    except Exception as exc:
+        result = dict(result)
+        result["installed"] = False
+        result["install_error"] = str(exc)
+
+    return result
 
 
 @mcp.tool()

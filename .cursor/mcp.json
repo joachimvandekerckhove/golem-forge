@@ -1,8 +1,8 @@
 {
   "mcpServers": {
     "golemforge": {
-      "command": "python",
-      "args": ["golemforge/mcp_server.py"]
+      "command": ".venv/bin/python",
+      "args": ["mcp_server.py"]
     }
   }
 }
