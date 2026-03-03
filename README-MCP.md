@@ -15,59 +15,94 @@
 - Provenance hashes for included skills + compiled prompt.
 - Prompt truncation safety if output exceeds 100k characters.
 
-## Project layout
+## Project layout (top level)
 
 ```text
-golemforge/
-  mcp_server.py
-  names.json
-  templates/
-    base_system.md
-  skills/
-    .gitkeep
-  README.md
-  pyproject.toml
-  .gitignore
+.
+├── mcp_server.py       # MCP server entrypoint (FastMCP)
+├── pyproject.toml      # Python package metadata (name: "golemforge")
+├── names.json          # Deterministic skill naming
+├── templates/
+│   └── base_system.md  # Base system prompt template
+├── skills/             # Local skill markdown files (optional)
+├── README.md           # Core golem-forge spec system
+└── README-MCP.md       # This file: MCP server docs
 ```
+
+The MCP server is packaged as a **single-module project** (`mcp_server.py`) with a console script entrypoint `golemforge-mcp`.
 
 ## Installation
 
-From repository root:
+### Simple Python install (no Cursor wiring)
+
+From a clean environment with Python ≥ 3.10:
 
 ```bash
 python -m venv .venv
-source .venv/bin/activate
-pip install -e ./golemforge
+. .venv/bin/activate
+python -m pip install --upgrade pip
+pip install "golemforge @ git+https://github.com/joachimvandekerckhove/golem-forge.git"
 ```
 
-Or install dependencies only:
+This exposes a `golemforge-mcp` executable in your virtual environment.
+
+### One-shot project setup for Cursor
+
+To set up `golemforge` as a **project-scoped MCP server for Cursor** in a single step, run this from the root of your Cursor project (not necessarily this repo):
 
 ```bash
-pip install fastmcp
+python -m venv .venv \
+&& . .venv/bin/activate \
+&& python -m pip install --upgrade pip \
+&& pip install "golemforge @ git+https://github.com/joachimvandekerckhove/golem-forge.git" \
+&& mkdir -p .cursor \
+&& python - <<'PY'
+import json, os
+root = os.getcwd()
+mcp_path = os.path.join(root, ".cursor", "mcp.json")
+os.makedirs(os.path.dirname(mcp_path), exist_ok=True)
+
+config = {"mcpServers": {}}
+if os.path.exists(mcp_path):
+    try:
+        with open(mcp_path) as f:
+            config = json.load(f)
+    except Exception:
+        pass
+
+config.setdefault("mcpServers", {})["golemforge"] = {
+    "command": os.path.join(root, ".venv", "bin", "golemforge-mcp"),
+    "args": []
+}
+
+with open(mcp_path, "w") as f:
+    json.dump(config, f, indent=2)
+print("Configured golemforge MCP at", mcp_path)
+PY
 ```
+
+After this, open the project in Cursor; it will detect the `golemforge` MCP server automatically.
 
 ## Running locally (STDIO)
 
-From repository root:
+If you want to run the server manually (for testing, or outside Cursor), use:
 
 ```bash
-python golemforge/mcp_server.py
+golemforge-mcp
 ```
 
 This starts the MCP server in STDIO mode for a host client (such as Cursor).
 
 ## Cursor setup
 
-Create/update `.cursor/mcp.json` in your project (or global Cursor MCP config) with a `command` + `args` entry. Cursor can also configure MCP servers via Settings UI.
-
-Example project-level config:
+Create/update `.cursor/mcp.json` in your project (or global Cursor MCP config) with a `command` + `args` entry. Cursor can also configure MCP servers via Settings UI. The one-shot script above does this automatically, but you can also edit it manually:
 
 ```json
 {
   "mcpServers": {
     "golemforge": {
-      "command": "python",
-      "args": ["golemforge/mcp_server.py"]
+      "command": "<ABSOLUTE_OR_PROJECT_LOCAL_PATH_TO>/golemforge-mcp",
+      "args": []
     }
   }
 }
@@ -127,14 +162,18 @@ To use the generated prompt as the **system prompt for every new chat** in this 
 
 ### 1) Quick syntax check
 
+If you are working from a local clone of this repository, you can sanity-check the module with:
+
 ```bash
-python -m py_compile golemforge/mcp_server.py
+python -m py_compile mcp_server.py
 ```
 
 ### 2) Smoke-run server
 
+From the same clone (with dependencies installed):
+
 ```bash
-python golemforge/mcp_server.py
+golemforge-mcp
 ```
 
 Use an MCP client (Cursor or compatible inspector) to call:
@@ -144,13 +183,7 @@ Use an MCP client (Cursor or compatible inspector) to call:
 
 ### 3) Minimal JSON-RPC style probe (example)
 
-If you have an MCP inspector/runner installed, start server with:
-
-```bash
-python golemforge/mcp_server.py
-```
-
-Then call tools interactively from the inspector UI. (Transport is STDIO.)
+If you have an MCP inspector/runner installed, start the server with `golemforge-mcp` and then call tools interactively from the inspector UI. (Transport is STDIO.)
 
 ## Notes
 

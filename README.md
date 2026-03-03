@@ -52,6 +52,11 @@ Crucially:
 │       └── golems/            # Composed golems for this project (generated)
 │           └── *.md
 │
+├── templates/
+│   └── base_system.md       # Base system template for MCP and other tooling
+├── mcp_server.py            # FastMCP-based MCP server for Cursor
+├── pyproject.toml           # Python packaging for the MCP server
+├── README-MCP.md            # Installation and usage docs for the MCP server
 └── Makefile
 ```
 
@@ -211,6 +216,41 @@ Shell scripts are POSIX-safe. Python scripts are explicit and auditable. `make` 
 3. Write or update a project description in `projects/<project>/project.md`.
 4. Run `make cast-all PROJECT=<project>`.
 5. Use the composed golems in Cursor or your preferred agent environment.
+
+If you are using **Cursor** and want a reusable MCP server that can forge and install these golem prompts for you, you can set it up for any project with a single command from that project’s root:
+
+```bash
+python -m venv .venv \
+&& . .venv/bin/activate \
+&& python -m pip install --upgrade pip \
+&& pip install "golemforge @ git+https://github.com/joachimvandekerckhove/golem-forge.git" \
+&& mkdir -p .cursor \
+&& python - <<'PY'
+import json, os
+root = os.getcwd()
+mcp_path = os.path.join(root, ".cursor", "mcp.json")
+os.makedirs(os.path.dirname(mcp_path), exist_ok=True)
+
+config = {"mcpServers": {}}
+if os.path.exists(mcp_path):
+    try:
+        with open(mcp_path) as f:
+            config = json.load(f)
+    except Exception:
+        pass
+
+config.setdefault("mcpServers", {})["golemforge"] = {
+    "command": os.path.join(root, ".venv", "bin", "golemforge-mcp"),
+    "args": []
+}
+
+with open(mcp_path, "w") as f:
+    json.dump(config, f, indent=2)
+print("Configured golemforge MCP at", mcp_path)
+PY
+```
+
+For more detail on the MCP server itself, see `README-MCP.md`.
 
 ---
 
