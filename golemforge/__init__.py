@@ -22,15 +22,33 @@ from fastmcp import FastMCP
 FORGE_VERSION = "0.1.0"
 MAX_PROMPT_CHARACTERS = 100_000
 
-PROJECT_ROOT = Path(__file__).resolve().parent
-SKILLS_DIR = PROJECT_ROOT / "skills"
-ROLES_DIR = PROJECT_ROOT / "roles"
-PERSONALITIES_DIR = PROJECT_ROOT / "personalities"
-TEMPLATES_DIR = PROJECT_ROOT / "templates"
+# Data files are bundled inside this package directory.
+_PACKAGE_ROOT = Path(__file__).resolve().parent
+SKILLS_DIR = _PACKAGE_ROOT / "skills"
+ROLES_DIR = _PACKAGE_ROOT / "roles"
+PERSONALITIES_DIR = _PACKAGE_ROOT / "personalities"
+TEMPLATES_DIR = _PACKAGE_ROOT / "templates"
 BASE_TEMPLATE_PATH = TEMPLATES_DIR / "base_system.md"
-NAMES_PATH = PROJECT_ROOT / "names.json"
-CURSOR_DIR = PROJECT_ROOT / ".cursor"
-GOLEM_SYSTEM_PATH = CURSOR_DIR / "golem-system.md"
+NAMES_PATH = _PACKAGE_ROOT / "names.json"
+
+_REPO_URL = "https://github.com/joachimvandekerckhove/golem-forge.git"
+
+_CONSTITUTION_CONTENT = """\
+---
+description: Apply the installed golem as system prompt when .cursor/golem-system.md exists
+alwaysApply: true
+---
+
+# Golem constitution
+
+When `.cursor/golem-system.md` exists and is non-empty, treat its contents as your **primary system prompt (constitution)** for this project.
+
+- At the start of each conversation, read that file.
+- If present: follow its instructions as your governing system prompt; they override generic behavior for this workspace.
+- If missing or empty: you are not in golem mode; proceed as usual.
+
+The file is written by the golemforge MCP tool `cast_and_install`. To change or clear the active golem, cast again with `cast_and_install` or delete `.cursor/golem-system.md`.
+"""
 
 mcp = FastMCP("golemforge")
 
@@ -129,6 +147,19 @@ def _load_names() -> list[str]:
         raise RuntimeError("names.json must contain a non-empty JSON array of names.")
     names = [str(item) for item in data]
     return names
+
+
+def _find_cursor_project_root() -> Path:
+    """Return the nearest ancestor of CWD that contains a .cursor/ directory.
+
+    Falls back to CWD if no such ancestor exists (e.g. fresh project with no
+    .cursor dir yet), which is the correct place to create one.
+    """
+    cwd = Path.cwd()
+    for directory in [cwd, *cwd.parents]:
+        if (directory / ".cursor").is_dir():
+            return directory
+    return cwd
 
 
 def _error_response(code: str, message: str, **extra: Any) -> dict[str, Any]:
@@ -401,9 +432,10 @@ def cast_and_install(
     """Forge a golem and install it as the project constitution for future chats.
 
     Same as `cast`, but also writes the compiled system prompt to
-    `.cursor/golem-system.md`. The project rule in `.cursor/rules/golem-constitution.mdc`
-    tells Cursor to apply that file as the system prompt for every new chat in this
-    project, so the golem persists across context limits and chat restarts.
+    `.cursor/golem-system.md` in the current Cursor project. The project rule
+    in `.cursor/rules/golem-constitution.mdc` tells Cursor to apply that file
+    as the system prompt for every new chat in this project, so the golem
+    persists across context limits and chat restarts.
     Use this when you want the cast golem to become the default assistant for
     this workspace.
     """
@@ -418,10 +450,13 @@ def cast_and_install(
         return result
 
     try:
-        CURSOR_DIR.mkdir(parents=True, exist_ok=True)
-        GOLEM_SYSTEM_PATH.write_text(result["compiled_prompt"], encoding="utf-8")
+        project_root = _find_cursor_project_root()
+        cursor_dir = project_root / ".cursor"
+        golem_system_path = cursor_dir / "golem-system.md"
+        cursor_dir.mkdir(parents=True, exist_ok=True)
+        golem_system_path.write_text(result["compiled_prompt"], encoding="utf-8")
         result = dict(result)
-        result["installed_path"] = str(GOLEM_SYSTEM_PATH.relative_to(PROJECT_ROOT))
+        result["installed_path"] = str(golem_system_path)
         result["installed"] = True
     except Exception as exc:
         result = dict(result)
@@ -479,16 +514,18 @@ def main() -> None:
 def install_cursor_cli() -> None:
     """Console entrypoint for wiring golemforge into a Cursor project.
 
-    This writes or updates `.cursor/mcp.json` in the target project so that
-    Cursor can discover the `golemforge` MCP server. It assumes you have
-    already installed `golemforge` into the active Python environment.
+    Writes or updates `.cursor/mcp.json` and installs the constitution rule
+    (`.cursor/rules/golem-constitution.mdc`) so that `cast_and_install` works
+    out of the box. The MCP server entry uses `uvx` so no virtual environment
+    management is needed in the target project.
     """
 
     parser = argparse.ArgumentParser(
         prog="golemforge-install-cursor",
         description=(
             "Configure the current directory (or a given project) to use the "
-            "golemforge MCP server in Cursor by updating .cursor/mcp.json."
+            "golemforge MCP server in Cursor by updating .cursor/mcp.json and "
+            "installing the constitution rule."
         ),
     )
     parser.add_argument(
@@ -501,9 +538,12 @@ def install_cursor_cli() -> None:
     project_root = Path(args.project_dir).resolve()
     cursor_dir = project_root / ".cursor"
     mcp_path = cursor_dir / "mcp.json"
+    rules_dir = cursor_dir / "rules"
+    constitution_path = rules_dir / "golem-constitution.mdc"
 
     cursor_dir.mkdir(parents=True, exist_ok=True)
 
+    # Read existing mcp.json if present, preserving other server entries.
     config: dict[str, Any] = {"mcpServers": {}}
     if mcp_path.exists():
         try:
@@ -512,17 +552,19 @@ def install_cursor_cli() -> None:
             if isinstance(existing, dict):
                 config.update(existing)
         except Exception:
-            # Fall back to a minimal config if existing file is invalid.
             config = {"mcpServers": {}}
 
     if "mcpServers" not in config or not isinstance(config["mcpServers"], dict):
         config["mcpServers"] = {}
 
-    # Resolve the golemforge-mcp executable in the current Python environment.
-    command_path = Path(sys.executable).with_name("golemforge-mcp")
+    # Configure Cursor to launch the server via uvx — no venv needed.
     config["mcpServers"]["golemforge"] = {
-        "command": str(command_path),
-        "args": [],
+        "command": "uvx",
+        "args": [
+            "--from",
+            f"git+{_REPO_URL}",
+            "golemforge-mcp",
+        ],
     }
 
     with mcp_path.open("w", encoding="utf-8") as f:
@@ -530,6 +572,12 @@ def install_cursor_cli() -> None:
 
     print(f"Configured golemforge MCP at {mcp_path}")
 
+    # Write the constitution rule so cast_and_install works immediately.
+    rules_dir.mkdir(parents=True, exist_ok=True)
+    constitution_path.write_text(_CONSTITUTION_CONTENT, encoding="utf-8")
+    print(f"Installed constitution rule at {constitution_path}")
 
-if __name__ == "__main__":
-    main()
+    print(
+        "\nDone. Reload the Cursor window (Ctrl+Shift+P → 'Reload Window') to "
+        "activate the golemforge MCP server."
+    )

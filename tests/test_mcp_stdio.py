@@ -9,13 +9,10 @@ from __future__ import annotations
 import asyncio
 import json
 import sys
-from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from fastmcp import Client
 
-from mcp_server import mcp as server
+from golemforge import mcp as server
 
 
 async def main() -> int:

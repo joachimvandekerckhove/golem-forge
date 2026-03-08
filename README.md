@@ -1,20 +1,43 @@
 # golem-forge
 
-`golem-forge` is a small set of files for describing AI "golems" as **roles**, **personalities**, and **skills**, plus an MCP server so Cursor can assemble prompts from those markdown files.
+`golem-forge` is an MCP server for Cursor that assembles AI assistant "golems" from composable plain-text files — **roles**, **personalities**, and **skills** — into a single system prompt.
 
-The aim is practical: keep the pieces that define an assistant in plain text, under version control, and easy to inspect.
+In Terry Pratchett's Discworld, golems are clay workers animated by a written scroll. Changing the scroll changes who they are. The markdown files in `golemforge/roles/`, `golemforge/personalities/`, and `golemforge/skills/` play the same role here.
 
-In Terry Pratchett's Discworld books, golems are clay workers animated by a written scroll in their head. Changing the words on that scroll changes who they are and what they care about. This repository plays a similar role for AI helpers: the markdown files in `roles/`, `personalities/`, and `skills/` are the "scroll", and the MCP server simply reads and stitches them together.
+---
+
+## Install into a Cursor project
+
+From any Cursor project terminal — no local clone required:
+
+```bash
+uvx --from "git+https://github.com/joachimvandekerckhove/golem-forge.git" golemforge-install-cursor
+```
+
+Requires [`uv`](https://docs.astral.sh/uv/). If not installed:
+
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
+```
+
+After the command finishes, reload the Cursor window (Ctrl+Shift+P → **Reload Window**) to activate the server.
+
+The install command does three things:
+1. Downloads the package from GitHub and runs the installer — no virtual environment needed in the target project.
+2. Creates or updates `.cursor/mcp.json` with a `"golemforge"` entry that launches the server via `uvx`.
+3. Creates `.cursor/rules/golem-constitution.mdc` so that `cast_and_install` works immediately.
+
+> `installation-prompt.md` in this repo contains the same instructions in a form you can paste directly into a Cursor chat window, for AI-assisted installation.
 
 ---
 
 ## Concepts
 
-- **Roles**: describe what the assistant is responsible for (for example: writer, analyst, reviewer). Role definitions live in `roles/*.md`.
-- **Personalities**: describe how the assistant communicates and reasons (for example: precise-formal, explanatory-empathetic). These live in `personalities/*.md`.
-- **Skills**: describe concrete capabilities or procedures (for example: `coding/python`, `modeling/bayesian-inference`). These live in `skills/*.md`.
+- **Roles** — what the assistant is responsible for (e.g. `writer`, `analyst`, `reviewer`). Defined in `golemforge/roles/*.md`.
+- **Personalities** — how the assistant communicates (e.g. `precise-formal`, `explanatory-empathetic`). Defined in `golemforge/personalities/*.md`.
+- **Skills** — concrete capabilities or procedures (e.g. `coding/python`, `modeling/bayesian-inference`). Defined in `golemforge/skills/**/*.md`.
 
-The MCP server can include any combination of skills, and optionally a role and personality, into a single composed system prompt. Users should edit or add skills, roles, and personalities to the `skills/`, `roles/`, and `personalities/` directories to match their own needs and preferences.
+Any combination of skills, with an optional role and personality, can be forged into a single composed system prompt.
 
 ---
 
@@ -22,78 +45,54 @@ The MCP server can include any combination of skills, and optionally a role and 
 
 ```text
 .
-├── roles/                    # Role markdown files (optional in MCP casts)
-├── personalities/            # Personality markdown files (optional in MCP casts)
-├── skills/                   # Skill markdown files used by the MCP server
-├── templates/
-│   └── base_system.md        # Base system template for composed prompts
-├── mcp_server.py             # FastMCP-based MCP server entrypoint
-├── pyproject.toml            # Python packaging for the MCP server
-├── names.json                # Deterministic list of golem names
-├── tests/                    # MCP server tests (direct + STDIO transport)
-├── README.md                 # This file: overview and reference
-└── installation-prompt.md    # Paste-ready prompt for AI-driven installation
-```
-
----
-
-## Installation and Cursor setup
-
-From a clean environment with Python >= 3.10, in your Cursor project:
-
-```bash
-python -m venv .venv
-. .venv/bin/activate
-python -m pip install --upgrade pip
-python -m pip install "golemforge @ git+https://github.com/joachimvandekerckhove/golem-forge.git"
-golemforge-install-cursor
-```
-
-This installs the MCP server into `.venv` and creates or updates `.cursor/mcp.json` so Cursor can discover the `golemforge` MCP server.
-
-If you only want a library-style install (no project wiring), you can stop after the `pip install` step. The `golemforge-mcp` executable will still be available in the virtual environment.
-
-To run the server manually (for testing or use with another MCP client):
-
-```bash
-golemforge-mcp
+├── golemforge/               # Installable Python package
+│   ├── __init__.py           # MCP server (FastMCP)
+│   ├── roles/                # Role markdown files
+│   ├── personalities/        # Personality markdown files
+│   ├── skills/               # Skill markdown files
+│   ├── templates/
+│   │   └── base_system.md    # Base system prompt template
+│   └── names.json            # Pool of golem persona names
+├── tests/                    # Direct and STDIO transport tests
+├── pyproject.toml            # Package definition
+├── installation-prompt.md    # Paste into a Cursor chat to install
+└── README.md
 ```
 
 ---
 
 ## MCP tools
 
-All tools live under the `golemforge` MCP server.
+| Tool | Description |
+|---|---|
+| `list_skills()` | List available skill IDs |
+| `list_roles()` | List available role IDs |
+| `list_personalities()` | List available personality IDs |
+| `cast(skills, ...)` | Forge a full prompt package with provenance |
+| `cast_pasteblock(skills, ...)` | Forge only the paste-ready block |
+| `cast_and_install(skills, ...)` | Forge and write to `.cursor/golem-system.md` |
+| `explain_cast(skills)` | Dry-run preview: files, sizes, missing skills |
 
-- **`list_skills()`**: returns available skill IDs from `skills/*.md`.
-- **`list_roles()`**: returns available role IDs from `roles/*.md`.
-- **`list_personalities()`**: returns available personality IDs from `personalities/*.md`.
+All casting tools accept `skills` (list of IDs), `extra_instructions` (string), `role` (optional ID), and `personality` (optional ID).
 
-- **`cast(skills, extra_instructions="", role=None, personality=None)`**  
-  Builds a full prompt package:
-  - includes the base template, selected skills, and optional role and personality;
-  - returns `golem_name`, `compiled_prompt`, `paste_block`, `skill_hashes`, and a small manifest (including optional `role`, `role_hash`, `personality`, `personality_hash`).
-
-- **`cast_pasteblock(skills, extra_instructions="", role=None, personality=None)`**  
-  Lighter version of `cast` that returns only `golem_name` and `paste_block`.
-
-- **`cast_and_install(skills, extra_instructions="", role=None, personality=None)`**  
-  Like `cast`, but also writes the compiled system prompt to `.cursor/golem-system.md` in the current project so that Cursor can treat it as a persistent "constitution" (assuming the project includes the `.cursor/rules/golem-constitution.mdc` rule file).
-
-- **`explain_cast(skills)`**  
-  Shows which files would be included, which skills are missing, and an approximate character-count for the resulting prompt.
-
-When a requested skill, role, or personality is missing, the tools return a small error payload with a short code (for example, `missing_skills`, `missing_role`, `missing_personality`) and a suggestion about which listing tool to call.
+`cast_and_install` writes the compiled prompt to `.cursor/golem-system.md` in the current Cursor project. The constitution rule installed by `golemforge-install-cursor` tells Cursor to apply that file as the system prompt for every new chat in the project.
 
 ---
 
-## Self-checks
+## Development
 
-If you are working from a local clone of this repository, you can run a few quick checks:
+Clone the repo, create a virtual environment, and install in editable mode:
 
 ```bash
-python -m py_compile mcp_server.py
-python tests/test_mcp_server.py
+git clone https://github.com/joachimvandekerckhove/golem-forge.git
+cd golem-forge
+python -m venv .venv && source .venv/bin/activate
+pip install -e .
 ```
 
-The test script exercises the main tools directly and prints a short summary.
+Run tests:
+
+```bash
+python tests/test_mcp_server.py
+python tests/test_mcp_stdio.py
+```

@@ -12,8 +12,9 @@ dist/
 .pytest_cache/
 .ruff_cache/
 
-# Active golem constitution (written by cast_and_install); optional to commit
+# Active golem state (written at runtime; paths are environment-specific)
 .cursor/golem-system.md
+.cursor/mcp.json
 
 # working directory
 working/

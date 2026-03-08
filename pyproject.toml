@@ -13,8 +13,18 @@ dependencies = [
 ]
 
 [project.scripts]
-golemforge-mcp = "mcp_server:main"
-golemforge-install-cursor = "mcp_server:install_cursor_cli"
+golemforge-mcp = "golemforge:main"
+golemforge-install-cursor = "golemforge:install_cursor_cli"
 
-[tool.setuptools]
-py-modules = ["mcp_server"]
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["golemforge*"]
+
+[tool.setuptools.package-data]
+golemforge = [
+  "skills/**/*.md",
+  "roles/*.md",
+  "personalities/*.md",
+  "templates/*.md",
+  "names.json",
+]
