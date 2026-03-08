@@ -1,34 +1,58 @@
-**Prerequisites:** `git` must be installed (uv uses it to fetch the repo). On Linux: `sudo apt install git` or equivalent.
+**Instructions:** Install the golemforge MCP server in this project. Do the following in order: (1) ensure prerequisites and `uv` are available and on PATH, (2) run the golemforge installer from the project root, (3) reload Cursor and verify the tools. Details below.
+
+---
+
+**Prerequisites:** `git` (uv uses it to fetch the repo) and either `curl` or `wget` (to install uv). On Debian/Ubuntu:
+
+```bash
+sudo apt update && sudo apt install -y git curl
+```
+
+(or install `wget` instead of `curl` if you prefer).
 
 ---
 
 **1. Ensure `uv` is installed and on your PATH**
 
-If you don’t have `uv` yet, install it:
+In minimal or scripted environments, set PATH first so `uvx` is available in the same shell right after install:
+
+```bash
+export PATH="${HOME}/.local/bin:${PATH}"
+```
+
+If you don’t have `uv` yet, install it with **either**:
 
 ```bash
 curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 
-Then make sure `uv` is on your PATH (the installer puts it in `$HOME/.local/bin`). Either open a **new terminal**, or run:
+or, if you have `wget` but not `curl`:
+
+```bash
+wget -qO- https://astral.sh/uv/install.sh | sh
+```
+
+If you’re in a new terminal and `uvx` isn’t found, run the `export PATH` line above, or:
 
 ```bash
 source ~/.profile
 ```
 
-(or `source ~/.bashrc`). If `uvx` is still not found, run:
+(or `source ~/.bashrc`).
+
+Verify:
 
 ```bash
-export PATH="$HOME/.local/bin:$PATH"
+uvx --version
 ```
 
-Verify with: `uvx --version` (should print a version).
+(should print a version).
 
 ---
 
 **2. Install the golemforge MCP server**
 
-From your project root, run:
+From your project root (with `uvx` on your PATH), run:
 
 ```bash
 uvx --from "git+https://github.com/joachimvandekerckhove/golem-forge.git" golemforge-install-cursor
